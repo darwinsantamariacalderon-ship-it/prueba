@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora de fajas transportadoras</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Layout: panel de datos a la izquierda, resultados (resumen → verificaciones → memoria) a la derecha; una columna en teléfono */
+  --bg: #f3f4f5;
+  --panel: #ffffff;
+  --ink: #1c2126;
+  --muted: #5d6670;
+  --line: #d9dde1;
+  --accent: #e30613;
+  --accent-soft: #fde8e9;
+  --ok: #1d7a46;
+  --ok-soft: #e3f3ea;
+  --warn: #9a5b00;
+  --warn-soft: #fdf1dc;
+  --bad: #b3141c;
+  --bad-soft: #fbe3e4;
+  --info: #2c5d8a;
+  --info-soft: #e5eef7;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181b; --panel: #1e2226; --ink: #e8eaec; --muted: #9aa3ac; --line: #343a40;
+    --accent: #ff4a52; --accent-soft: #3a1c1e;
+    --ok: #5cc98b; --ok-soft: #17301f; --warn: #f0b552; --warn-soft: #36290f;
+    --bad: #ff6b72; --bad-soft: #3b1a1c; --info: #7fb2e5; --info-soft: #18283a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181b; --panel: #1e2226; --ink: #e8eaec; --muted: #9aa3ac; --line: #343a40;
+  --accent: #ff4a52; --accent-soft: #3a1c1e;
+  --ok: #5cc98b; --ok-soft: #17301f; --warn: #f0b552; --warn-soft: #36290f;
+  --bad: #ff6b72; --bad-soft: #3b1a1c; --info: #7fb2e5; --info-soft: #18283a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--body); }
+header { border-top: 4px solid var(--accent); background: var(--panel); border-bottom: 1px solid var(--line); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+header .wrap { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; padding-top: 18px; padding-bottom: 16px; }
+h1 { font: 700 26px/1.15 var(--display); margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13.5px; margin: 0; }
+main.wrap { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 20px; padding-top: 20px; padding-bottom: 40px; align-items: start; }
+@media (max-width: 860px) { main.wrap { grid-template-columns: 1fr; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+form.card { padding: 4px 18px 18px; }
+fieldset { border: 0; border-top: 1px solid var(--line); margin: 14px 0 0; padding: 12px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+fieldset:first-of-type { border-top: 0; }
+legend { font: 600 13px/1 var(--display); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); padding: 0 0 8px; }
+.full { grid-column: 1 / -1; }
+label { display: grid; gap: 3px; align-content: end; font-size: 12.5px; color: var(--muted); }
+label b { font-weight: 500; color: var(--ink); }
+input, select { font: 15px var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 8px; width: 100%; min-width: 0; }
+select { font-family: var(--body); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hint { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); background: var(--bg); border-left: 3px solid var(--line); padding: 6px 10px; margin: 0; }
+.results { display: grid; gap: 20px; min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1080px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.tile { padding: 14px 16px; display: grid; gap: 2px; align-content: start; }
+.tile .k { font: 600 12px/1.2 var(--display); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.tile .v { font: 600 30px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.tile .v small { font: 500 15px var(--body); color: var(--muted); margin-left: 3px; }
+.tile .d { font-size: 12.5px; color: var(--muted); }
+.tile.main { border-color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+section.card { padding: 16px 18px; }
+h2 { font: 600 18px/1.2 var(--display); margin: 0 0 10px; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checks li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: 14px; }
+.pill { font: 600 11px/1 var(--display); text-transform: uppercase; letter-spacing: .06em; padding: 5px 8px; border-radius: 99px; white-space: nowrap; min-width: 62px; text-align: center; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.info { background: var(--info-soft); color: var(--info); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 12px var(--display); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+td.f { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+tr.grp td { font: 600 12.5px var(--display); text-transform: uppercase; letter-spacing: .07em; color: var(--accent); background: var(--bg); }
+.bars { display: grid; gap: 8px; }
+.bar { display: grid; grid-template-columns: 150px 1fr 80px; gap: 10px; align-items: center; font-size: 13px; }
+.bar .track { height: 12px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--ink); opacity: .75; }
+.bar .fill.lift { background: var(--accent); opacity: 1; }
+.bar .num { font-family: var(--mono); text-align: right; }
+@media (max-width: 480px) { .bar { grid-template-columns: 110px 1fr 66px; } }
+.widths { display: flex; flex-wrap: wrap; gap: 6px; }
+.wchip { font: 500 13px var(--mono); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; display: grid; gap: 1px; text-align: center; min-width: 74px; }
+.wchip span { font: 11px var(--body); color: var(--muted); }
+.wchip.sel { border-color: var(--accent); background: var(--accent-soft); }
+.wchip.no { opacity: .45; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+button { font: 600 13px var(--display); letter-spacing: .04em; text-transform: uppercase; border: 1px solid var(--ink); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 4px; cursor: pointer; }
+button:hover { background: var(--accent); border-color: var(--accent); }
+.note { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; max-width: 75ch; }
+footer { color: var(--muted); font-size: 12px; }
+footer .wrap { padding-bottom: 28px; }
+@media (prefers-reduced-motion: no-preference) { .bar .fill { transition: width .25s ease; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Calculadora de fajas transportadoras</h1>
+    <p class="sub">Ancho, capacidad, potencia y tensiones · ISO 5048 / DIN 22101 · corrección por altitud</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <form class="card" id="f" autocomplete="off" novalidate>
+    <fieldset>
+      <legend>Material</legend>
+      <label class="full"><b>Material</b>
+        <select id="mat"></select>
+      </label>
+      <label><b>Densidad aparente</b> kg/m³<input id="rho" type="number" step="10" min="50"></label>
+      <label><b>Ángulo de sobrecarga</b> °<input id="theta" type="number" step="1" min="0" max="35"></label>
+      <label><b>Inclinación máx.</b> °<input id="incmax" type="number" step="1" min="0" max="35"></label>
+      <label><b>Velocidad máx.</b> m/s<input id="vmax" type="number" step="0.1" min="0.2"></label>
+      <label><b>Terrón máx.</b> mm<input id="lump" type="number" step="5" min="0"></label>
+      <p class="hint full" id="matnote"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Operación y trazado</legend>
+      <label><b>Capacidad requerida</b> t/h<input id="Q" type="number" step="5" min="0.1"></label>
+      <label><b>Velocidad de faja</b> m/s<input id="v" type="number" step="0.1" min="0.1"></label>
+      <label><b>Longitud horiz.</b> m<input id="L" type="number" step="1" min="1"></label>
+      <label><b>Elevación neta H</b> m<input id="H" type="number" step="0.5"></label>
+      <label><b>Altitud de planta</b> m s. n. m.<input id="alt" type="number" step="50" min="0"></label>
+      <label><b>Llenado máx. de diseño</b> %<input id="fillmax" type="number" step="5" min="30" max="100"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Faja y estaciones</legend>
+      <label><b>Ancho de faja B</b>
+        <select id="B"></select>
+      </label>
+      <label><b>Ángulo de artesa</b>
+        <select id="lam">
+          <option value="0">0° (plana)</option>
+          <option value="20">20°</option>
+          <option value="30">30°</option>
+          <option value="35">35°</option>
+          <option value="45">45°</option>
+        </select>
+      </label>
+      <label><b>Masa de faja</b> kg/m²<input id="qbm2" type="number" step="0.5" min="3"></label>
+      <label><b>Espaciado rodillos carga</b> m<input id="ao" type="number" step="0.1" min="0.3"></label>
+      <label><b>Rodillos carga q<sub>RO</sub></b> kg/m<input id="qro" type="number" step="0.5" placeholder="auto"></label>
+      <label><b>Rodillos retorno q<sub>RU</sub></b> kg/m<input id="qru" type="number" step="0.5" placeholder="auto"></label>
+      <p class="hint">Deja q<sub>RO</sub> y q<sub>RU</sub> vacíos para usar 10·B+2 y 4·B+1 (B en m), como en tu script.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Resistencias y accionamiento</legend>
+      <label><b>Factor f</b>
+        <select id="f_">
+          <option value="0.017">0.017 alineada</option>
+          <option value="0.020">0.020 normal</option>
+          <option value="0.023">0.023 polvo/frío</option>
+          <option value="0.027">0.027 severa</option>
+          <option value="0.030">0.030 muy severa</option>
+        </select>
+      </label>
+      <label><b>Raspadores</b> unid.<input id="nscr" type="number" step="1" min="0"></label>
+      <label><b>Longitud de faldones</b> m<input id="lsk" type="number" step="0.5" min="0"></label>
+      <label><b>Eficiencia η</b> reductor + acople<input id="eta" type="number" step="0.01" min="0.5" max="1"></label>
+      <label><b>Tambor motriz</b> μ
+        <select id="mu">
+          <option value="0.35">Engomado 0.35</option>
+          <option value="0.25">Sin recubrir 0.25</option>
+          <option value="0.40">Cerámico 0.40</option>
+        </select>
+      </label>
+      <label><b>Ángulo de abrace</b> °<input id="arc" type="number" step="5" min="150" max="420"></label>
+      <label><b>Factor de seguridad faja</b><input id="sf" type="number" step="0.5" min="5"></label>
+      <label><b>Flecha admisible</b> %<input id="sag" type="number" step="0.1" min="0.5" max="3"></label>
+    </fieldset>
+  </form>
+
+  <div class="results">
+    <div class="tiles">
+      <div class="card tile main"><span class="k">Motor sugerido</span><span class="v" id="t_motor">–</span><span class="d" id="t_motor_d"></span></div>
+      <div class="card tile"><span class="k">Ancho mínimo</span><span class="v" id="t_bmin">–</span><span class="d" id="t_bmin_d"></span></div>
+      <div class="card tile"><span class="k">Llenado</span><span class="v" id="t_fill">–</span><span class="d" id="t_fill_d"></span></div>
+      <div class="card tile"><span class="k">Faja requerida</span><span class="v" id="t_belt">–</span><span class="d" id="t_belt_d"></span></div>
+    </div>
+
+    <section class="card">
+      <h2>Verificaciones</h2>
+      <ul class="checks" id="checks"></ul>
+    </section>
+
+    <section class="card">
+      <div class="row"><h2>Capacidad por ancho estándar</h2></div>
+      <div class="widths" id="widths"></div>
+      <p class="note">Capacidad máxima a la velocidad y artesa elegidas, con la sección de carga de DIN 22101 (ancho útil b = 0.9·B − 0.05) y el factor de reducción por inclinación. En rojo, el ancho seleccionado; atenuados, los que no alcanzan la capacidad requerida.</p>
+    </section>
+
+    <section class="card">
+      <h2>Fuerza periférica F<sub>U</sub> por componente</h2>
+      <div class="bars" id="bars"></div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>Memoria de cálculo</h2>
+        <button type="button" id="copy">Copiar resumen</button>
+      </div>
+      <div class="tablewrap"><table id="memo"></table></div>
+      <p class="note">Predimensionamiento. Las propiedades de material son valores típicos de referencia (CEMA y literatura técnica): confirma la densidad aparente con laboratorio. Para L &lt; 80 m el factor C es aproximado; para fajas largas, con curvas o tramos descendentes, haz el cálculo detallado por tramos o con el proveedor.</p>
+    </section>
+  </div>
+</main>
+
+<footer><div class="wrap">Darwin Santamaría Calderón · Ingeniería mecánica · Herramienta de predimensionamiento</div></footer>
+
+<script id="calc">
+const G = 9.81;
+
+const MATERIALES = {
+  caliza:   { n: "Caliza chancada",               rho: 1400, theta: 20, inc: 18, vmax: 3.0, lump: 100, nota: "Abrasiva. Densidad típica 1360–1440 kg/m³. Usar cubiertas de alta resistencia a la abrasión." },
+  cemento:  { n: "Cemento Portland",              rho: 1300, theta: 15, inc: 20, vmax: 1.0, lump: 0,   nota: "Polvo fino que se fluidiza (1200–1500 kg/m³ según aireación). Faja cubierta y velocidad baja; para tramos largos suele preferirse aerodeslizador o elevador." },
+  clinker:  { n: "Clínker",                       rho: 1360, theta: 20, inc: 18, vmax: 2.5, lump: 50,  nota: "Muy abrasivo (1200–1520 kg/m³). Si llega caliente, usar faja resistente a temperatura o transportador metálico." },
+  arcilla_s:{ n: "Arcilla seca en terrones",      rho: 1100, theta: 20, inc: 20, vmax: 3.0, lump: 100, nota: "Densidad típica 960–1200 kg/m³." },
+  arcilla_h:{ n: "Arcilla húmeda",                rho: 1700, theta: 25, inc: 20, vmax: 2.5, lump: 100, nota: "Pegajosa: prever raspadores primario y secundario, y revisar acumulación en tambores y chutes." },
+  hierro:   { n: "Óxido / mineral de hierro",     rho: 2100, theta: 20, inc: 18, vmax: 2.5, lump: 75,  nota: "Corrector de hierro. Densidad muy variable (1600–3200 kg/m³): medirla. Pesado y abrasivo." },
+  aserrin:  { n: "Aserrín",                       rho: 210,  theta: 25, inc: 22, vmax: 3.0, lump: 0,   nota: "Muy liviano (160–210 kg/m³): la capacidad la limita el volumen, no la potencia. Proteger del viento y controlar polvo." },
+  biomasa:  { n: "Biomasa / astillas de madera",  rho: 300,  theta: 25, inc: 25, vmax: 3.0, lump: 50,  nota: "Densidad 160–480 kg/m³ según humedad y granulometría." },
+  yeso:     { n: "Yeso en terrones",              rho: 1200, theta: 20, inc: 18, vmax: 2.5, lump: 75,  nota: "Densidad típica 1120–1280 kg/m³." },
+  carbon:   { n: "Carbón bituminoso",             rho: 800,  theta: 20, inc: 18, vmax: 3.0, lump: 50,  nota: "Densidad 720–880 kg/m³. Riesgo de polvo combustible: control de derrames y limpieza." },
+  petcoke:  { n: "Coque de petróleo",             rho: 650,  theta: 20, inc: 20, vmax: 3.0, lump: 25,  nota: "Densidad 560–720 kg/m³. Polvo combustible." },
+  arena:    { n: "Arena seca",                    rho: 1600, theta: 20, inc: 16, vmax: 3.0, lump: 0,   nota: "Densidad 1440–1760 kg/m³. Muy abrasiva." },
+  otro:     { n: "Otro (personalizado)",          rho: 1000, theta: 20, inc: 18, vmax: 2.5, lump: 50,  nota: "Ingresa las propiedades del material." }
+};
+
+const ANCHOS = [400, 500, 650, 800, 1000, 1200, 1400, 1600, 1800, 2000];
+// Longitud del rodillo central en estaciones de 3 rodillos (ISO 1537), mm
+const L3 = { 400: 160, 500: 200, 650: 250, 800: 315, 1000: 380, 1200: 465, 1400: 530, 1600: 600, 1800: 670, 2000: 750 };
+const MOTORES = [0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315, 355, 400, 450, 500];
+const CLASES_EP = [250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000];
+const TABLA_C = [[80,1.92],[90,1.86],[100,1.78],[120,1.70],[140,1.63],[160,1.56],[180,1.50],[200,1.45],[250,1.38],[300,1.31],[350,1.27],[400,1.25],[450,1.20],[500,1.20],[550,1.18],[600,1.17],[700,1.14],[800,1.12],[900,1.10],[1000,1.09],[1500,1.06],[2000,1.05],[2500,1.04],[5000,1.03]];
+
+function factorC(L) {
+  if (L < 80) return { C: (L + 70) / L, corto: true };
+  for (let i = 0; i < TABLA_C.length - 1; i++) {
+    const [l1, c1] = TABLA_C[i], [l2, c2] = TABLA_C[i + 1];
+    if (L >= l1 && L <= l2) return { C: c1 + (c2 - c1) * (L - l1) / (l2 - l1), corto: false };
+  }
+  return { C: 1.03, corto: false };
+}
+
+const rad = d => d * Math.PI / 180;
+
+// Sección de carga DIN 22101 (m²) y factor por inclinación
+function seccion(Bmm, lamDeg, thetaDeg, deltaDeg) {
+  const B = Bmm / 1000;
+  const b = 0.9 * B - 0.05;
+  const lam = rad(lamDeg), th = rad(thetaDeg);
+  const l3 = lamDeg === 0 ? b : Math.min(L3[Bmm] / 1000, b);
+  const lado = (b - l3) / 2;
+  const A1 = Math.pow(l3 + 2 * lado * Math.cos(lam), 2) * Math.tan(th) / 6;
+  const A2 = (l3 + lado * Math.cos(lam)) * (lado * Math.sin(lam));
+  const A = A1 + A2;
+  const d = rad(Math.abs(deltaDeg));
+  let phi1 = 0;
+  if (thetaDeg > 0 && d < th) phi1 = Math.sqrt((Math.cos(d) ** 2 - Math.cos(th) ** 2) / (1 - Math.cos(th) ** 2));
+  const phiSt = A > 0 ? 1 - (A1 / A) * (1 - phi1) : 1;
+  return { b, A1, A2, A, phiSt };
+}
+
+function capacidadMax(Bmm, p, deltaDeg) {
+  const s = seccion(Bmm, p.lam, p.theta, deltaDeg);
+  return { ...s, Qmax: 3.6 * s.A * s.phiSt * p.v * p.rho }; // t/h
+}
+
+function calcular(p) {
+  const deltaDeg = Math.atan2(p.H, p.L) * 180 / Math.PI;
+  const B = p.B / 1000;
+  const cap = capacidadMax(p.B, p, deltaDeg);
+  const llenado = p.Q / cap.Qmax;
+  const porAncho = ANCHOS.map(w => ({ B: w, Qmax: capacidadMax(w, p, deltaDeg).Qmax }));
+  const bMin = porAncho.find(x => p.Q <= x.Qmax * p.fillmax);
+
+  const qG = p.Q / (3.6 * p.v);
+  const qB = p.qbm2 * B;
+  const qRO = p.qro != null ? p.qro : 10 * B + 2;
+  const qRU = p.qru != null ? p.qru : 4 * B + 1;
+  const { C, corto } = factorC(p.L);
+  const delta = rad(deltaDeg);
+
+  const FH = p.f * p.L * G * (qRO + qRU + (2 * qB + qG) * Math.cos(delta));
+  const FN = (C - 1) * FH;
+  const FSt = qG * p.H * G;
+  const Iv = p.Q / 3.6 / p.rho;               // m³/s
+  const b1 = 0.66 * B;                        // ancho entre faldones
+  const Fsk = p.lsk > 0 ? 0.6 * Iv * Iv * p.rho * G * p.lsk / (p.v * p.v * b1 * b1) : 0;
+  const Fscr = p.nscr * 0.01 * B * 6e4 * 0.6; // A·p·μ3 por raspador
+  const FS = Fsk + Fscr;
+  const FU = FH + FN + FSt + FS;
+
+  const Ptambor = FU * p.v / 1000;
+  const Pmotor = Ptambor / p.eta;
+  const der = Math.max(0, (p.alt - 1000) / 100 * 0.01);
+  const Palt = der < 0.5 ? Math.abs(Pmotor) / (1 - der) : NaN;
+  const motor = MOTORES.find(m => m >= Palt) || null;
+
+  const eMu = Math.exp(p.mu * rad(p.arc));
+  const T2euler = Math.abs(FU) / (eMu - 1);
+  const Tflecha = p.ao * (qB + qG) * G / (8 * p.sag);
+  const T2 = Math.max(T2euler, Tflecha);
+  const T1 = Math.abs(FU) + T2;
+  const kN = T1 * p.sf / p.B;                 // N/mm
+  const clase = CLASES_EP.find(c => c >= kN) || null;
+
+  return { deltaDeg, cap, llenado, porAncho, bMin, qG, qB, qRO, qRU, C, corto, FH, FN, FSt, Fsk, Fscr, FS, FU,
+           Ptambor, Pmotor, der, Palt, motor, T2euler, Tflecha, T2, T1, kN, clase, contrapeso: 2 * T2 / G };
+}
+
+function verificaciones(p, r, mat) {
+  const out = [];
+  const inc = Math.abs(r.deltaDeg);
+  if (inc > p.incmax) out.push(["bad", `Inclinación de ${inc.toFixed(1)}° supera el máximo de ${p.incmax}° para este material. Alarga el trazado o usa faja con nervios/cangilones.`]);
+  else out.push(["ok", `Inclinación de ${inc.toFixed(1)}° dentro del máximo de ${p.incmax}°.`]);
+
+  if (r.llenado > 1) out.push(["bad", `La faja de ${p.B} mm no transporta ${p.Q} t/h a ${p.v} m/s (llenado ${(r.llenado*100).toFixed(0)} %). Sube el ancho o la velocidad.`]);
+  else if (r.llenado > p.fillmax) out.push(["warn", `Llenado de ${(r.llenado*100).toFixed(0)} % por encima del ${(p.fillmax*100).toFixed(0)} % de diseño: poca reserva ante picos y riesgo de derrames.`]);
+  else out.push(["ok", `Llenado de ${(r.llenado*100).toFixed(0)} % (límite de diseño ${(p.fillmax*100).toFixed(0)} %).`]);
+
+  if (p.v > p.vmax) out.push(["warn", `Velocidad de ${p.v} m/s mayor que la recomendada (${p.vmax} m/s) para ${mat.n.toLowerCase()}: más polvo, desgaste y derrame en la carga.`]);
+  else out.push(["ok", `Velocidad dentro de lo recomendado (≤ ${p.vmax} m/s).`]);
+
+  if (p.lump > 0) {
+    if (p.lump > p.B / 3) out.push(["bad", `Terrón de ${p.lump} mm mayor que B/3 (${(p.B/3).toFixed(0)} mm). Aumenta el ancho o reduce la granulometría.`]);
+    else if (p.lump > p.B / 5) out.push(["warn", `Terrón de ${p.lump} mm aceptable solo si los terrones son minoría (B/5 = ${(p.B/5).toFixed(0)} mm).`]);
+    else out.push(["ok", `Terrón máximo compatible con el ancho.`]);
+  }
+
+  if (r.FU < 0) out.push(["bad", "Faja regenerativa (descendente): el material arrastra la faja. Requiere freno, antirretorno y análisis de frenado; el motor indicado es de referencia."]);
+  else if (p.H > 0) out.push(["info", "Faja inclinada ascendente: prever antirretorno (backstop) en el reductor."]);
+
+  if (r.corto) out.push(["info", `L = ${p.L} m < 80 m: el factor C = ${r.C.toFixed(2)} es aproximado. Para fajas cortas conviene detallar las resistencias secundarias (CEMA/DIN).`]);
+  if (r.der > 0) out.push(["info", `Altitud ${p.alt} m: motor derrateado ${(r.der*100).toFixed(0)} % (≈1 %/100 m sobre 1000 m, IEC 60034-1). Confírmalo con el fabricante.`]);
+  if (!r.clase) out.push(["bad", `Tensión requerida (${r.kN.toFixed(0)} N/mm) por encima de las clases EP habituales: evaluar faja de cables de acero (ST).`]);
+  if (!r.motor) out.push(["bad", "Potencia por encima de 500 kW: evaluar accionamiento múltiple."]);
+  return out;
+}
+</script>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (x, d = 1) => Number.isFinite(x) ? x.toLocaleString("es-PE", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–";
+
+const defaults = { mat: "caliza", Q: 250, v: 2.0, L: 120, H: 15, alt: 3800, fillmax: 85, B: "650", lam: "35", qbm2: 16, ao: 1.2, f_: "0.023", nscr: 2, lsk: 3, eta: 0.90, mu: "0.35", arc: 200, sf: 10, sag: 1.0 };
+
+function initSelects() {
+  $("mat").innerHTML = Object.entries(MATERIALES).map(([k, m]) => `<option value="${k}">${m.n}</option>`).join("");
+  $("B").innerHTML = ANCHOS.map(w => `<option value="${w}">${w} mm</option>`).join("");
+}
+
+function cargarMaterial(k) {
+  const m = MATERIALES[k];
+  $("rho").value = m.rho; $("theta").value = m.theta; $("incmax").value = m.inc; $("vmax").value = m.vmax; $("lump").value = m.lump;
+  $("matnote").textContent = m.nota + " Valores referenciales: ajústalos a tu material.";
+}
+
+function num(id) { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : null; }
+
+function leer() {
+  return {
+    rho: num("rho") || 1000, theta: num("theta") ?? 20, incmax: num("incmax") ?? 18, vmax: num("vmax") || 2.5, lump: num("lump") || 0,
+    Q: num("Q") || 1, v: num("v") || 1, L: num("L") || 1, H: num("H") || 0, alt: num("alt") || 0, fillmax: (num("fillmax") || 85) / 100,
+    B: parseInt($("B").value, 10), lam: parseInt($("lam").value, 10), qbm2: num("qbm2") || 15, ao: num("ao") || 1.2,
+    qro: num("qro"), qru: num("qru"), f: parseFloat($("f_").value), nscr: num("nscr") || 0, lsk: num("lsk") || 0,
+    eta: num("eta") || 0.9, mu: parseFloat($("mu").value), arc: num("arc") || 180, sf: num("sf") || 10, sag: (num("sag") || 1) / 100
+  };
+}
+
+let ultimo = "";
+
+function render() {
+  const p = leer();
+  const mat = MATERIALES[$("mat").value];
+  const r = calcular(p);
+
+  $("t_motor").innerHTML = r.motor ? `${fmt(r.motor, r.motor < 10 ? 1 : 0)}<small>kW</small>` : "> 500<small>kW</small>";
+  $("t_motor_d").textContent = `Requerido ${fmt(r.Palt)} kW a ${fmt(p.alt, 0)} m (${fmt(r.Pmotor)} kW a nivel del mar)`;
+  $("t_bmin").innerHTML = r.bMin ? `${r.bMin.B}<small>mm</small>` : "> 2000<small>mm</small>";
+  $("t_bmin_d").textContent = `Con llenado ≤ ${fmt(p.fillmax * 100, 0)} %, ${p.v} m/s y artesa ${p.lam}°`;
+  $("t_fill").innerHTML = `${fmt(r.llenado * 100, 0)}<small>%</small>`;
+  $("t_fill_d").textContent = `Faja de ${p.B} mm: máx. ${fmt(r.cap.Qmax, 0)} t/h`;
+  $("t_belt").innerHTML = r.clase ? `EP ${r.clase}` : "ST";
+  $("t_belt_d").textContent = `T₁ = ${fmt(r.T1 / 1000)} kN · ${fmt(r.kN, 0)} N/mm con FS ${p.sf}`;
+
+  const chk = verificaciones(p, r, mat);
+  const etiqueta = { ok: "Cumple", warn: "Revisar", bad: "No cumple", info: "Nota" };
+  $("checks").innerHTML = chk.map(([t, s]) => `<li><span class="pill ${t}">${etiqueta[t]}</span><span>${s}</span></li>`).join("");
+
+  $("widths").innerHTML = r.porAncho.map(x => {
+    const cls = x.B === p.B ? "sel" : (p.Q > x.Qmax ? "no" : "");
+    return `<div class="wchip ${cls}">${x.B}<span>${fmt(x.Qmax, 0)} t/h</span></div>`;
+  }).join("");
+
+  const comps = [
+    ["Principal F_H", r.FH, false], ["Secundarias F_N", r.FN, false], ["Elevación F_St", r.FSt, true],
+    ["Faldones", r.Fsk, false], ["Raspadores", r.Fscr, false]
+  ];
+  const maxF = Math.max(...comps.map(c => Math.abs(c[1])), 1);
+  $("bars").innerHTML = comps.map(([n, val, lift]) =>
+    `<div class="bar"><span>${n}</span><div class="track"><div class="fill ${lift ? "lift" : ""}" style="width:${(Math.abs(val) / maxF * 100).toFixed(1)}%"></div></div><span class="num">${fmt(val / 1000, 2)} kN</span></div>`
+  ).join("") + `<div class="bar"><b>Total F_U</b><span></span><b class="num">${fmt(r.FU / 1000, 2)} kN</b></div>`;
+
+  const filas = [
+    ["Geometría y carga"],
+    ["Ángulo de inclinación δ", "atan(H/L)", r.deltaDeg, 1, "°"],
+    ["Ancho útil b", "0.9·B − 0.05", r.cap.b * 1000, 0, "mm"],
+    ["Sección de carga A", "A₁ + A₂ (DIN 22101)", r.cap.A, 4, "m²"],
+    ["Factor por inclinación φ", "1 − (A₁/A)(1 − φ₁)", r.cap.phiSt, 3, ""],
+    ["Capacidad máxima", "3.6·A·φ·v·ρ", r.cap.Qmax, 0, "t/h"],
+    ["Masa de material q_G", "Q / (3.6·v)", r.qG, 1, "kg/m"],
+    ["Masa de faja q_B", "m² · B", r.qB, 1, "kg/m"],
+    ["Rodillos q_RO / q_RU", "", null, 0, "", `${fmt(r.qRO)} / ${fmt(r.qRU)} kg/m`],
+    ["Resistencias"],
+    ["Factor C", r.corto ? "(L+70)/L" : "tabla ISO 5048", r.C, 2, ""],
+    ["Principal F_H", "f·L·g·[q_RO+q_RU+(2q_B+q_G)cos δ]", r.FH / 1000, 2, "kN"],
+    ["Secundarias F_N", "(C − 1)·F_H", r.FN / 1000, 2, "kN"],
+    ["Elevación F_St", "q_G·H·g", r.FSt / 1000, 2, "kN"],
+    ["Faldones", "μ₂·I_v²·ρ·g·l / (v²·b₁²)", r.Fsk / 1000, 2, "kN"],
+    ["Raspadores", "n·A·p·μ₃", r.Fscr / 1000, 2, "kN"],
+    ["Fuerza periférica F_U", "suma", r.FU / 1000, 2, "kN"],
+    ["Potencia"],
+    ["En tambor motriz", "F_U·v", r.Ptambor, 1, "kW"],
+    ["En motor (nivel del mar)", "P / η", r.Pmotor, 1, "kW"],
+    ["Derrateo por altitud", "1 %/100 m > 1000 m", r.der * 100, 0, "%"],
+    ["Requerida a la altitud", "P / (1 − derrateo)", r.Palt, 1, "kW"],
+    ["Motor IEC sugerido", "siguiente estándar", r.motor, 1, "kW"],
+    ["Tensiones"],
+    ["T₂ mínima por adherencia", "F_U / (e^{μα} − 1)", r.T2euler / 1000, 2, "kN"],
+    ["T mínima por flecha", "a₀·(q_B+q_G)·g / (8·h/a)", r.Tflecha / 1000, 2, "kN"],
+    ["T₂ de diseño", "máx. de las dos", r.T2 / 1000, 2, "kN"],
+    ["T₁ lado tenso", "F_U + T₂", r.T1 / 1000, 2, "kN"],
+    ["Resistencia requerida", "T₁·FS / B", r.kN, 0, "N/mm"],
+    ["Contrapeso (tensor en cabeza)", "2·T₂ / g", r.contrapeso, 0, "kg"]
+  ];
+  $("memo").innerHTML = `<thead><tr><th>Concepto</th><th>Expresión</th><th style="text-align:right">Valor</th></tr></thead><tbody>` +
+    filas.map(f => f.length === 1
+      ? `<tr class="grp"><td colspan="3">${f[0]}</td></tr>`
+      : `<tr><td>${f[0]}</td><td class="f">${f[1]}</td><td class="num">${f[5] || (fmt(f[2], f[3]) + " " + f[4])}</td></tr>`
+    ).join("") + `</tbody>`;
+
+  ultimo = [
+    `Faja transportadora — ${mat.n}`,
+    `Q ${p.Q} t/h · v ${p.v} m/s · L ${p.L} m · H ${p.H} m · altitud ${p.alt} m`,
+    `B ${p.B} mm, artesa ${p.lam}° · llenado ${fmt(r.llenado * 100, 0)} % (máx. ${fmt(r.cap.Qmax, 0)} t/h) · ancho mínimo ${r.bMin ? r.bMin.B + " mm" : "> 2000 mm"}`,
+    `F_U ${fmt(r.FU / 1000, 2)} kN · P tambor ${fmt(r.Ptambor)} kW · P motor ${fmt(r.Pmotor)} kW · a la altitud ${fmt(r.Palt)} kW → motor ${r.motor ?? "> 500"} kW`,
+    `T1 ${fmt(r.T1 / 1000, 2)} kN · T2 ${fmt(r.T2 / 1000, 2)} kN · ${fmt(r.kN, 0)} N/mm → ${r.clase ? "EP " + r.clase : "ST"}`,
+    ...chk.filter(c => c[0] !== "ok").map(c => `- ${c[1]}`)
+  ].join("\n");
+}
+
+initSelects();
+for (const [k, v] of Object.entries(defaults)) if ($(k)) $(k).value = v;
+cargarMaterial(defaults.mat);
+$("mat").addEventListener("change", e => { cargarMaterial(e.target.value); render(); });
+$("f").addEventListener("input", render);
+$("f").addEventListener("submit", e => e.preventDefault());
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(ultimo); $("copy").textContent = "Copiado"; }
+  catch { $("copy").textContent = "No se pudo copiar"; }
+  setTimeout(() => { $("copy").textContent = "Copiar resumen"; }, 1800);
+});
+render();
+</script>
+</body>
+</html>
